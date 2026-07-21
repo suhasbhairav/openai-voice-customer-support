@@ -1,3 +1,4 @@
+import { parseJsonRequest, validateRequestBody, toSafeError } from "@/lib/production-guardrails";
 export const runtime = "nodejs";
 
 function offlineResult(prompt) {
@@ -16,7 +17,12 @@ Voice agent setup:
 }
 
 export async function POST(request) {
-  const body = await request.json().catch(() => ({}));
+  const body = await parseJsonRequest(request);
+  const guardrail = validateRequestBody(body);
+  if (!guardrail.ok) {
+    return Response.json({ error: guardrail.error }, { status: guardrail.status });
+  }
+
   const prompt = typeof body.prompt === "string" ? body.prompt.trim() : "A voice customer support starter with realtime session setup and support handoff design.";
 
   if (!process.env.OPENAI_API_KEY) {
@@ -57,7 +63,7 @@ export async function POST(request) {
     });
   } catch (error) {
     return Response.json(
-      { error: error.message || "Realtime session creation failed." },
+      { error: toSafeError(error, "Realtime session creation failed.") },
       { status: 500 },
     );
   }
